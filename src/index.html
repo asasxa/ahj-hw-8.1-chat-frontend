@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Chat</title>
+</head>
+
+<body>
+  <!-- список пользователей -->
+  <div class="users-list-container">
+    <ul class="users-list">
+    </ul>
+  </div>
+
+  <!-- чат -->
+  <div class="chat-widget">
+    <div class="chat-widget__area">
+      <div class="chat-widget__messages-container">
+        <div class="chat-widget__messages" id="chat-widget__messages">
+        </div>
+      </div>
+      <input id="chat-widget__input" class="chat-widget__input">
+    </div>
+  </div>
+
+  <!-- модальное окно -->
+  <div class="modal">
+    <div class="modal__content">
+      <h3 class="modal__header">Выберите псевдоним</h3>
+      <form class="modal__form">
+        <input class="modal-form__input" type="text" name="nickname"  maxlength="15" autocomplete="off">
+        <button class="modal-form__button-continue" type="submit">Продолжить</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- анимация при подключении к серверу -->
+  <img class="status-loading active" src="./img/loading.svg" alt="image of the loading process">
+</body>
+
+</html>

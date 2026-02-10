@@ -16,7 +16,7 @@ const usersList = usersContainer.querySelector('.users-list');
 
 // Инициализация
 const errorHandler = new ErrorHandler(input);
-const baseUrl = 'simple-chat-2021.herokuapp.com';
+const baseUrl = 'ahj-hw-8-1-chat-backend.onrender.com';
 const api = new API(`https://${baseUrl}`, modal, input, loading);
 
 // Попытка подключения к серверу

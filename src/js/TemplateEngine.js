@@ -1,43 +1,48 @@
 export default class TemplateEngine {
-  // создадим метод для заполнения списка пользователей
   static getUsersHTML(data, ownName) {
-    let html = '';
+    const fragment = document.createDocumentFragment();
 
     data.forEach((userName) => {
-      html += `
-        <li class="users-list__user ${userName === ownName ? 'self' : ''}">${userName === ownName ? 'You' : userName}</li>
-      `;
+      const li = document.createElement('li');
+      li.className = `users-list__user ${userName === ownName ? 'self' : ''}`;
+      li.textContent = userName === ownName ? 'You' : userName;
+      fragment.appendChild(li);
     });
 
-    return html;
+    return fragment;
   }
 
-  // создадим метод для получения текущего времени в формате "мм:чч дд.мм.гггг"
   static getTime() {
     const date = new Date();
-
     const options = { dateStyle: 'short', timeStyle: 'short' };
-
     const formattedDate = new Intl.DateTimeFormat('ru-RU', options)
       .format(date)
       .split(',')
       .reverse()
       .join(' ');
-
     return formattedDate;
   }
 
-  // создадим метод для добавления чужих сообщений в чат
   static addMessage(messages, data, ownName, messagesContainer) {
     const time = this.getTime();
 
-    messages.insertAdjacentHTML('beforeend', `
-      <div class="message ${data.author === ownName ? 'self' : ''}">
-        <div class="message__header">${data.author === ownName ? 'You' : data.author}, ${time}</div>
-        <div class="message__text">${data.message}</div>
-      </div>
-    `);
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${data.author === ownName ? 'self' : ''}`;
 
-    messagesContainer.scrollTo(0, messagesContainer.scrollHeight);
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'message__header';
+    headerDiv.textContent = `${data.author === ownName ? 'You' : data.author}, ${time}`;
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message__text';
+    textDiv.textContent = data.message;
+
+    messageDiv.appendChild(headerDiv);
+    messageDiv.appendChild(textDiv);
+    messages.appendChild(messageDiv);
+
+    if (messagesContainer) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
   }
 }

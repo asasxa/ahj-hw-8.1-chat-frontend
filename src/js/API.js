@@ -9,39 +9,65 @@ export default class API extends ErrorHandler {
     this.contentTypeHeader = { 'Content-Type': 'application/json' };
   }
 
-  connection() {
-    fetch(`${this.baseUrl}/check`).then(
-      () => {
-        this.loading.classList.remove('active');
-        this.modal.classList.add('active');
-      },
-      () => {
-        this.connection();
-      },
-    );
+  async connection(maxRetries = 10, delayMs = 2000) {
+    let attempt = 0;
+
+    const tryConnect = async () => {
+      try {
+        const response = await fetch(`${this.baseUrl}/check`);
+        if (response.ok) {
+          this.loading.classList.remove('active');
+          this.modal.classList.add('active');
+          return true;
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (error) {
+        attempt++;
+        console.warn(`Попытка ${attempt} не удалась:`, error.message);
+
+        if (attempt >= maxRetries) {
+          this.outputError('Не удалось подключиться к серверу. Проверьте соединение и обновите страницу.');
+          this.loading.classList.remove('active');
+          return false;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        return tryConnect();
+      }
+    };
+
+    return tryConnect();
   }
 
-  add(contact) {
+  async add(contact) {
     this.input.disabled = true;
     this.input.placeholder = 'Подождите, ваш запрос обрабатывается...';
-    return fetch(`${this.baseUrl}/users`, {
-      body: JSON.stringify(contact),
-      method: 'POST',
-      headers: this.contentTypeHeader,
-    }).then((response) => {
+
+    try {
+      const response = await fetch(`${this.baseUrl}/users`, {
+        method: 'POST',
+        headers: this.contentTypeHeader,
+        body: JSON.stringify(contact),
+      });
+
       if (!response.ok) {
-        throw Error(response.statusText);
+        const text = await response.text();
+        throw new Error(response.status === 400 ? 'Bad Request' : response.statusText);
       }
+
       return response;
-    }).catch((response) => {
+    } catch (error) {
       this.input.placeholder = '';
-      if (response.message === 'Failed to fetch') {
+      this.input.disabled = false;
+
+      if (error.message === 'Failed to fetch') {
         this.outputError('Ошибка! Сервер недоступен.');
-      } else if (response.message === 'Bad Request') {
+      } else if (error.message === 'Bad Request') {
         this.outputError('Ошибка! Имя уже существует.');
       } else {
-        this.outputError(`Неизвестная ошибка: ${response.message}.`);
+        this.outputError(`Неизвестная ошибка: ${error.message}.`);
       }
-    });
+    }
   }
 }

@@ -2,6 +2,7 @@ import ErrorHandler from './ErrorHandler';
 import API from './API';
 import TemplateEngine from './TemplateEngine';
 
+// DOM-элементы
 const modal = document.querySelector('.modal');
 const form = modal.querySelector('.modal__form');
 const input = form.querySelector('.modal-form__input');
@@ -10,14 +11,18 @@ const messagesContainer = chat.querySelector('.chat-widget__messages-container')
 const messages = chat.querySelector('.chat-widget__messages');
 const chatInput = chat.querySelector('.chat-widget__input');
 const loading = document.querySelector('.status-loading');
+const usersContainer = document.querySelector('.users-list-container');
+const usersList = usersContainer.querySelector('.users-list');
 
+// Инициализация
 const errorHandler = new ErrorHandler(input);
-
 const baseUrl = 'simple-chat-2021.herokuapp.com';
-
 const api = new API(`https://${baseUrl}`, modal, input, loading);
+
+// Попытка подключения к серверу
 api.connection();
 
+// Обработка формы выбора имени
 form.onsubmit = (event) => {
   event.preventDefault();
 
@@ -32,90 +37,90 @@ form.onsubmit = (event) => {
   input.value = '';
 
   (async () => {
-    // регистрируем имя пользователя на сервере
-    const response = await api.add({ name: ownName });
+    try {
+      // Регистрация имени
+      const response = await api.add({ name: ownName });
+      if (!response) return; // ошибка уже обработана в API.add()
 
-    if (response) {
-      // если имя уникально
-
-      // откроем веб-сокет соединение
+      // Подключение по WebSocket
       const ws = new WebSocket(`wss://${baseUrl}`);
 
-      // добавим обработчики чата
-      chatInput.addEventListener('keyup', (chatInputEvent) => {
-        if (chatInputEvent.key === 'Enter') {
-          const { value: msg } = chatInput;
-          if (!msg || !msg.trim()) {
-            chatInput.value = '';
-            return;
-          }
-
-          const newMessage = JSON.stringify(
-            {
-              author: ownName,
-              message: msg.trim(),
-            },
-          );
-
-          ws.send(newMessage);
-
-          chatInput.value = '';
-        }
+      // Обработка ошибок WebSocket
+      ws.addEventListener('error', (event) => {
+        console.error('WebSocket error:', event);
+        chatInput.disabled = true;
+        chatInput.placeholder = 'Ошибка подключения к серверу';
       });
 
-      document.onclick = (documentEvent) => {
-        if (!documentEvent.target.closest('.chat-widget')) {
-          chatInput.value = '';
-        }
-      };
-
-      // найдем список пользователей
-      const usersContainer = document.querySelector('.users-list-container');
-      const usersList = usersContainer.querySelector('.users-list');
-
-      // обработаем входящие от сервера
-      ws.addEventListener('message', (wsMsgEvent) => {
-        // если сервер прислал нам сообщение
-        const data = JSON.parse(wsMsgEvent.data);
-
-        if (Array.isArray(data)) {
-          // обновим список пользователей
-          usersList.textContent = '';
-          usersList.insertAdjacentHTML('beforeend', TemplateEngine.getUsersHTML(data, ownName));
-        } else if (typeof data === 'object') {
-          // или добавим сообщение в чат лист
-          TemplateEngine.addMessage(messages, data, ownName, messagesContainer);
-        }
-      });
-
-      // уведомим пользователя при обрыве соединения
+      // Соединение закрыто
       ws.addEventListener('close', () => {
         chatInput.disabled = true;
         chatInput.placeholder = 'Работа сервера приостановлена';
       });
 
-      // уведомим пользователя при восстановлении соединения
+      // Соединение открыто
       ws.addEventListener('open', () => {
         chatInput.disabled = false;
         chatInput.placeholder = 'Введите ваше сообщение';
+        usersContainer.classList.add('active'); // показываем список пользователей
       });
 
-      // спрячем модальное окно
+      // Обработка входящих сообщений и списка пользователей
+      ws.addEventListener('message', (wsMsgEvent) => {
+        try {
+          const data = JSON.parse(wsMsgEvent.data);
+
+          if (Array.isArray(data)) {
+            // Обновление списка пользователей
+            usersList.textContent = '';
+            usersList.insertAdjacentHTML('beforeend', TemplateEngine.getUsersHTML(data, ownName));
+          } else if (data && typeof data === 'object' && data.author && data.message) {
+            // Добавление сообщения в чат
+            TemplateEngine.addMessage(messages, data, ownName, messagesContainer);
+          }
+        } catch (e) {
+          console.warn('Некорректные данные от сервера:', wsMsgEvent.data);
+        }
+      });
+
+      // Отправка сообщений
+      chatInput.addEventListener('keyup', (event) => {
+        if (event.key === 'Enter') {
+          const msg = chatInput.value.trim();
+          if (!msg) {
+            chatInput.value = '';
+            return;
+          }
+
+          const newMessage = JSON.stringify({
+            author: ownName,
+            message: msg,
+          });
+
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(newMessage);
+          } else {
+            console.warn('Сообщение не отправлено: WebSocket не подключён');
+          }
+
+          chatInput.value = '';
+        }
+      });
+
+      // Очистка поля ввода при клике вне чата
+      document.addEventListener('click', (event) => {
+        if (!event.target.closest('.chat-widget')) {
+          chatInput.value = '';
+        }
+      });
+
+      // Скрыть модальное окно и показать чат
       modal.classList.remove('active');
-
-      setInterval(() => {
-        // покажем список пользователей
-        usersContainer.classList.add('active');
-      }, 1000);
-
-      // покажем чат
       chat.classList.add('active');
-
-      // очистим чат, чтобы при дублировании окна не остался старый текст
-      chatInput.value = '';
-
-      // установим курсор в поле ввода чата
       chatInput.focus();
+
+    } catch (error) {
+      console.error('Неожиданная ошибка при инициализации чата:', error);
     }
   })();
 };

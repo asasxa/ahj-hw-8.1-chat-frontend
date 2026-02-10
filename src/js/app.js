@@ -2,7 +2,6 @@ import ErrorHandler from './ErrorHandler';
 import API from './API';
 import TemplateEngine from './TemplateEngine';
 
-// DOM-элементы
 const modal = document.querySelector('.modal');
 const form = modal.querySelector('.modal__form');
 const input = form.querySelector('.modal-form__input');
@@ -14,15 +13,12 @@ const loading = document.querySelector('.status-loading');
 const usersContainer = document.querySelector('.users-list-container');
 const usersList = usersContainer.querySelector('.users-list');
 
-// Инициализация
 const errorHandler = new ErrorHandler(input);
 const baseUrl = 'ahj-hw-8-1-chat-backend.onrender.com';
 const api = new API(`https://${baseUrl}`, modal, input, loading);
 
-// Попытка подключения к серверу
 api.connection();
 
-// Обработка формы выбора имени
 form.onsubmit = (event) => {
   event.preventDefault();
 
@@ -38,44 +34,41 @@ form.onsubmit = (event) => {
 
   (async () => {
     try {
-      // Регистрация имени
       const response = await api.add({ name: ownName });
-      if (!response) return; // ошибка уже обработана в API.add()
+      if (!response) return;
 
-      // Подключение по WebSocket
+      loading.textContent = 'Подключение к чату...';
+      loading.classList.add('active');
+
       const ws = new WebSocket(`wss://${baseUrl}`);
 
-      // Обработка ошибок WebSocket
-      ws.addEventListener('error', (event) => {
-        console.error('WebSocket error:', event);
-        chatInput.disabled = true;
-        chatInput.placeholder = 'Ошибка подключения к серверу';
+      ws.addEventListener('error', () => {
+        loading.classList.remove('active');
+        errorHandler.outputError('Не удалось подключиться к чату. Попробуйте позже.');
       });
 
-      // Соединение закрыто
       ws.addEventListener('close', () => {
         chatInput.disabled = true;
-        chatInput.placeholder = 'Работа сервера приостановлена';
+        chatInput.placeholder = 'Соединение с сервером потеряно';
       });
 
-      // Соединение открыто
       ws.addEventListener('open', () => {
+        loading.classList.remove('active');
+        modal.classList.remove('active');
+        chat.classList.add('active');
         chatInput.disabled = false;
         chatInput.placeholder = 'Введите ваше сообщение';
-        usersContainer.classList.add('active'); // показываем список пользователей
+        chatInput.focus();
+        usersContainer.classList.add('active');
       });
 
-      // Обработка входящих сообщений и списка пользователей
       ws.addEventListener('message', (wsMsgEvent) => {
         try {
           const data = JSON.parse(wsMsgEvent.data);
-
           if (Array.isArray(data)) {
-            // Обновление списка пользователей
             usersList.textContent = '';
-            usersList.insertAdjacentHTML('beforeend', TemplateEngine.getUsersHTML(data, ownName));
+            usersList.appendChild(TemplateEngine.getUsersHTML(data, ownName));
           } else if (data && typeof data === 'object' && data.author && data.message) {
-            // Добавление сообщения в чат
             TemplateEngine.addMessage(messages, data, ownName, messagesContainer);
           }
         } catch (e) {
@@ -83,7 +76,6 @@ form.onsubmit = (event) => {
         }
       });
 
-      // Отправка сообщений
       chatInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
           const msg = chatInput.value.trim();
@@ -92,35 +84,22 @@ form.onsubmit = (event) => {
             return;
           }
 
-          const newMessage = JSON.stringify({
-            author: ownName,
-            message: msg,
-          });
-
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(newMessage);
-          } else {
-            console.warn('Сообщение не отправлено: WebSocket не подключён');
+            ws.send(JSON.stringify({ author: ownName, message: msg }));
           }
-
           chatInput.value = '';
         }
       });
 
-      // Очистка поля ввода при клике вне чата
       document.addEventListener('click', (event) => {
         if (!event.target.closest('.chat-widget')) {
           chatInput.value = '';
         }
       });
 
-      // Скрыть модальное окно и показать чат
-      modal.classList.remove('active');
-      chat.classList.add('active');
-      chatInput.focus();
-
     } catch (error) {
       console.error('Неожиданная ошибка при инициализации чата:', error);
+      loading.classList.remove('active');
     }
   })();
 };
